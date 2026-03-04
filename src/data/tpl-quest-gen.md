@@ -24,6 +24,13 @@ Use ONLY IDs from this list for any itemid field or packed item list:
 The following items have special rules or non-obvious behavior:
 {itemNotes}
 
+## Quest types
+
+Use ONLY the following quest types. Match the approved theme to the most appropriate type and follow its required output fields exactly:
+{questTypes}
+
+---
+
 ## specialBlob tags
 
 | Tag                   | Description                                                                                                                                                                                                                                  |

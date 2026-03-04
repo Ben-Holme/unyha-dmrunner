@@ -82,3 +82,98 @@ Example:
     "message": "..."
   $)
 $)
+
+---
+
+## GoToQuestGiver
+Player must travel to a named quest giver (by title) who has a quest waiting for them.
+Use when linking quest chains across different NPCs or directing the player to travel to another area.
+This is always an intermediate step — it carries no reward (reward comes from the subsequent quest the destination NPC provides).
+The step completes automatically when the player interacts with the destination NPC; the player does not return to the originating NPC.
+
+Required output fields:
+- `advanceItems.items`: set to `charevent:1`
+- `advanceItems.special`: set to `#gototrader:{destination NPC title}` — the NPC who has the next quest
+- `characterTitle`: the destination NPC's title (same value as in the special string)
+- `specialBlob`: must include `#autocomplete`
+- No `objective`, no `reward` on this step
+
+Example:
+($
+  "title": "...",
+  "description": "...",
+  "advanceItems": ($
+    "items": "charevent:1",
+    "special": "#gototrader:The Ash Warden"
+  $),
+  "characterTitle": "The Ash Warden",
+  "specialBlob": "#autocomplete"
+$)
+
+---
+
+## goToLocation
+Player must travel to a specified world location.
+Use when the narrative sends the player to a place rather than a person — a ruin, a camp, a road junction, etc.
+The step completes automatically when the player reaches the location; no NPC interaction required.
+
+Required output fields:
+- `advanceItems.items`: set to `charevent:1`
+- `advanceItems.special`: set to `#gotolocation:{location name}` — the world location the player must reach
+- `specialBlob`: must include `#autocomplete`
+- No `objective`, no `reward` on this step (unless it is the final step in a chain)
+
+Example:
+($
+  "title": "...",
+  "description": "...",
+  "advanceItems": ($
+    "items": "charevent:1",
+    "special": "#gotolocation:The Ashford Crossing"
+  $),
+  "specialBlob": "#autocomplete"
+$)
+
+---
+
+## reachTitle
+Player must accumulate enough fame to hold a specified title or above.
+Use when a quest giver will only deal with a player of sufficient standing, or when reaching a title is itself the goal of a quest chain step.
+The step completes automatically when the player's title reaches the required rank; they do not need to return to an NPC.
+
+Required output fields:
+- `objective.special`: set to `#reachtitle:{title}` — the exact title the player must reach (e.g. `#reachtitle:Proven`)
+- `specialBlob`: must include `#autocomplete`
+- No `objective.itemid`, no `objective.amount`
+
+Example:
+($
+  "title": "...",
+  "description": "...",
+  "objective": ($
+    "special": "#reachtitle:Proven"
+  $),
+  "specialBlob": "#autocomplete"
+$)
+
+---
+
+## reachSkillLevel
+Player must train a specified skill to a target level.
+Use when a quest giver requires demonstrated proficiency, or when skill growth is the narrative focus of a step.
+The step completes automatically when the player's skill reaches the required level; they do not need to return to an NPC.
+
+Required output fields:
+- `skillName`: string — the skill the player must level (e.g. `"Smithing"`)
+- `skillLevel`: int — the target level the player must reach
+- `specialBlob`: must include `#autocomplete`
+- No `objective`
+
+Example:
+($
+  "title": "...",
+  "description": "...",
+  "skillName": "Smithing",
+  "skillLevel": 5,
+  "specialBlob": "#autocomplete"
+$)
