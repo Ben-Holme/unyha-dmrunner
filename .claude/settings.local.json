@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(yarn --version)",
+      "Bash(yarn build)",
+      "Bash(grep -rn \"format\\\\|field\" /c/projects/unyha-dmrunner/src/data/*.md)"
+    ]
+  }
+}
