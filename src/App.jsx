@@ -597,14 +597,27 @@ export default function App() {
 		}
 		if (key === "generate") {
 			if (parsed?.quests?.length)
-				return parsed.quests.map((q, i) => (
-					<div key={i}>
-						<div style={{color: "#6b5e4e", fontSize: 11, marginBottom: 2}}>Step {i + 1}</div>
-						<pre style={{color: "#d4c9b8", fontSize: 12, whiteSpace: "pre-wrap", margin: "0 0 12px"}}>
-							{JSON.stringify(q, null, 2)}
-						</pre>
-					</div>
-				));
+				return parsed.quests.map((q, i) => {
+					let enriched = q;
+					if (q.objective?.special?.startsWith("#uniqueid:") && q.monsterName) {
+						const questDropItem = {
+							itemid: q.objective.itemid,
+							mobName: q.monsterName,
+							dropPercent: 20,
+							special: q.objective.special,
+							...(q.objective.nameOverride ? {nameOverride: q.objective.nameOverride} : {}),
+						};
+						enriched = {...q, questDropItem};
+					}
+					return (
+						<div key={i}>
+							<div style={{color: "#6b5e4e", fontSize: 11, marginBottom: 2}}>Step {i + 1}</div>
+							<pre style={{color: "#d4c9b8", fontSize: 12, whiteSpace: "pre-wrap", margin: "0 0 12px"}}>
+								{JSON.stringify(enriched, null, 2)}
+							</pre>
+						</div>
+					);
+				});
 			if (parsed?.quest)
 				return (
 					<pre style={{color: "#d4c9b8", fontSize: 12, whiteSpace: "pre-wrap", margin: 0}}>

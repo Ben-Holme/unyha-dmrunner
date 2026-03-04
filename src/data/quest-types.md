@@ -31,6 +31,8 @@ Use when the narrative calls for hunting a named enemy type — bandits, orcs, a
 
 While the quest is active, the engine enables a unique monster drop: all monsters whose name matches `monsterName` have a chance to drop the specified item. The dropped item carries a `nameOverride` and a unique `special` string used as a key — the quest only accepts items with that exact `special` value.
 
+The `questDropItem` block is automatically derived from `objective` and `monsterName` — do NOT include it in your output.
+
 Required output fields:
 - `objective.itemid`: base item type for the drop (e.g. `"head"`)
 - `objective.amount`: how many are required

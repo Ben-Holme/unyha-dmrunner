@@ -94,13 +94,6 @@ $),
 "nameOverride": "", // string — display name override
 "message": "" // string — message shown on quest completion
 $),
-      "questDropItem": ($ // item that drops from a mob to trigger / advance quest
-"itemid": "", // string — item that drops
-"mobName": "", // string — mob that drops it
-"dropPercent": 0, // int — 0–100
-"special": "", // string — special tag on drop item
-"nameOverride": "" // string — display name override
-$),
       "requiredQuest": ($ // omit on step 1; set on each subsequent step
 "activeQuestTitle": "", // string — quest that must be ACTIVE for this quest to show
 "completedQuestTitle": "" // string — set to previous step's title to chain steps
