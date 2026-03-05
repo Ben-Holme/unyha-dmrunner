@@ -59,54 +59,34 @@ $)
 
 ---
 
-## goto
-Player must travel to a specific trader (quest giver / NPC) and interact with them.
-Use when the quest involves meeting, reporting to, or trading with a named trader at a location.
-
-Required output fields:
-- `advanceItems.items`: set to `charevent:1`
-- `advanceItems.special`: set to `#gototrader:{trader's title}` — replace with the actual trader title
-- `characterTitle`: the title of the trader giving the quest (same value used in the special string)
-
-Example:
-($
-  "title": "...",
-  "description": "...",
-  "advanceItems": ($
-    "items": "charevent:1",
-    "special": "#gototrader:The Old Tanner"
-  $),
-  "characterTitle": "The Old Tanner",
-  "reward": ($
-    "items": "goldCoin:30",
-    "message": "..."
-  $)
-$)
-
----
-
 ## GoToQuestGiver
-Player must travel to a named quest giver (by title) who has a quest waiting for them.
-Use when linking quest chains across different NPCs or directing the player to travel to another area.
-This is always an intermediate step — it carries no reward (reward comes from the subsequent quest the destination NPC provides).
-The step completes automatically when the player interacts with the destination NPC; the player does not return to the originating NPC.
+Player is sent by the current NPC to travel to a different NPC who has the next quest.
+Use when linking quest chains across different NPCs or directing the player to another area.
+This is always an intermediate step — it carries no reward.
+The step completes automatically when the player interacts with the destination NPC.
+
+**Chaining rule:** In a multi-step chain, each step's `npcTitle` must be the NPC *giving* that step — which is the destination NPC from the previous step. The `advanceItems.special` points to the *next* destination.
+
+Example of a two-step GoToQuestGiver chain:
+- Step 1 is given by NPC A (`npcTitle: "NPC A"`), sends player to NPC B (`#gototrader:NPC B`)
+- Step 2 is given by NPC B (`npcTitle: "NPC B"`), sends player to NPC C (`#gototrader:NPC C`)
 
 Required output fields:
+- `npcTitle`: title of the NPC giving this step — title ONLY, no name, must start with "the " (e.g. "the Warden", "the Iron Smith")
 - `advanceItems.items`: set to `charevent:1`
-- `advanceItems.special`: set to `#gototrader:{destination NPC title}` — the NPC who has the next quest
-- `characterTitle`: the destination NPC's title (same value as in the special string)
-- `specialBlob`: must include `#autocomplete`
+- `advanceItems.special`: set to `#gototrader:{destination NPC title}` — title only, no name, must start with "the "
+- `specialBlob`: must include `#autocomplete` (all non-final steps)
 - No `objective`, no `reward` on this step
 
 Example:
 ($
+  "npcTitle": "the Ash Warden",
   "title": "...",
   "description": "...",
   "advanceItems": ($
     "items": "charevent:1",
-    "special": "#gototrader:The Ash Warden"
+    "special": "#gototrader:the Iron Smith"
   $),
-  "characterTitle": "The Ash Warden",
   "specialBlob": "#autocomplete"
 $)
 

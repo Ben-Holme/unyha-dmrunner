@@ -12,6 +12,7 @@ import _TPL_QUEST_PLAN from "./data/tpl-quest-plan.md?raw";
 import _TPL_QUEST_GEN  from "./data/tpl-quest-gen.md?raw";
 import _ITEM_NOTES     from "./data/item-notes.md?raw";
 import _QUEST_TYPES    from "./data/quest-types.md?raw";
+import _TPL_ARC_SEED   from "./data/tpl-arc-seed.md?raw";
 
 const PRESETS = [
 	{
@@ -165,6 +166,7 @@ const SPEC_THOUGHT     = _SPEC_THOUGHT.trim();
 const SPEC_OUTPOST     = _SPEC_OUTPOST.trim();
 const TPL_QUEST_PLAN   = _TPL_QUEST_PLAN.trim();
 const TPL_QUEST_GEN    = _TPL_QUEST_GEN.trim().replace('{itemIds}', _ITEMS.trim()).replace('{itemNotes}', _ITEM_NOTES.trim()).replace('{questTypes}', _QUEST_TYPES.trim());
+const TPL_ARC_SEED     = _TPL_ARC_SEED.trim();
 
 const DEFAULT_QUEST_TPL = {
 	questPlan: {label: "01 — Quest Plan", desc: "Analyze context, choose theme", body: TPL_QUEST_PLAN},
@@ -276,6 +278,9 @@ export default function App() {
 
 	const [qTab, setQTab] = useState("context");
 	const [qCtx, setQCtx] = useState("");
+	const [qArc, setQArc] = useState("");
+	const [qSeasonDay, setQSeasonDay] = useState(1);
+	const [qForceType, setQForceType] = useState("");
 	const [qTpl, setQTpl] = useState(() => JSON.parse(JSON.stringify(DEFAULT_QUEST_TPL)));
 	const [qRunning, setQRunning] = useState(false);
 	const [qStages, setQStages] = useState([]);
@@ -283,6 +288,27 @@ export default function App() {
 	const [qDone, setQDone] = useState(false);
 	const [qLog, setQLog] = useState([]);
 	const qAbort = useRef(false);
+
+	const [arcRegistry, setArcRegistry] = useState(() => {
+		try { return JSON.parse(localStorage.getItem("arcRegistry") || "[]"); } catch { return []; }
+	});
+	const [arcInput, setArcInput] = useState("");
+	const [arcOwner, setArcOwner] = useState("");
+	const [arcRunning, setArcRunning] = useState(false);
+	const [arcResult, setArcResult] = useState(null);
+	const [arcExpanded, setArcExpanded] = useState(null);
+
+	const saveRegistry = (reg) => {
+		setArcRegistry(reg);
+		localStorage.setItem("arcRegistry", JSON.stringify(reg));
+	};
+
+	const appendChronicle = (arcId, beat) => {
+		if (!arcId || !beat) return;
+		saveRegistry(arcRegistry.map((a) =>
+			a.id === arcId ? {...a, chronicle: [...(a.chronicle || []), beat]} : a
+		));
+	};
 
 	const addLog = (m) => setLog((d) => [...d, `${new Date().toISOString().slice(11, 19)} ${m}`]);
 
@@ -464,6 +490,50 @@ export default function App() {
 		abort.current = false;
 	};
 
+	// ─── Arc seeder ──────────────────────────────────────────────────────────────
+
+	const arcRun = async () => {
+		if (!arcInput.trim()) return;
+		setArcRunning(true);
+		setArcResult(null);
+		const existingSummary = arcRegistry.length
+			? arcRegistry.map((a) => `- [${a.id}] "${a.arcTitle}": ${a.tension}`).join("\n")
+			: "none";
+		const msg = TPL_ARC_SEED
+			.replace("{concept}", arcInput)
+			.replace("{existingArcs}", existingSummary)
+			.replace(/\(\$/g, "{").replace(/\$\)/g, "}");
+		try {
+			const res = await fetch("https://api.openai.com/v1/chat/completions", {
+				method: "POST",
+				headers: {"Content-Type": "application/json", Authorization: `Bearer ${apiKey}`},
+				body: JSON.stringify({model: "gpt-4o", max_tokens: 1000, messages: [{role: "user", content: msg}]}),
+			});
+			const d = await res.json();
+			const text = (d.choices?.[0]?.message?.content || "")
+				.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+			let parsed = null;
+			try { parsed = JSON.parse(text); } catch {}
+			if (parsed?.mode === "arc") {
+				const newArc = {
+					...parsed,
+					id: `arc_${Date.now()}`,
+					owner: arcOwner.trim() || "unknown",
+					dayMinted: qSeasonDay,
+					status: "active",
+					chronicle: [],
+				};
+				saveRegistry([...arcRegistry, newArc]);
+				setArcResult({text, parsed: newArc, minted: true});
+			} else {
+				setArcResult({text, parsed, minted: false});
+			}
+		} catch (e) {
+			setArcResult({text: `Error: ${e.message}`, parsed: null});
+		}
+		setArcRunning(false);
+	};
+
 	// ─── Quest pipeline ──────────────────────────────────────────────────────────
 
 	const qAddLog = (m) => setQLog((d) => [...d, `${new Date().toISOString().slice(11, 19)} ${m}`]);
@@ -519,7 +589,17 @@ export default function App() {
 		setQTab("pipeline");
 		qAbort.current = false;
 
-		const planRaw = await qCall("plan", qTpl.questPlan.body.replace("{context}", qCtx));
+		const activeArc = arcRegistry.find((a) => a.id === qArc) || null;
+		const otherArcs = arcRegistry
+			.filter((a) => a.id !== qArc && a.status === "active")
+			.map((a) => `- "${a.arcTitle}": ${a.tension}`)
+			.join("\n") || "none";
+		const planRaw = await qCall("plan", qTpl.questPlan.body
+			.replace("{arc}", activeArc ? JSON.stringify(activeArc, null, 2) : "none")
+			.replace("{chronicle}", activeArc?.chronicle?.length ? activeArc.chronicle.join("\n") : "none")
+			.replace("{seasonDay}", String(qSeasonDay))
+			.replace("{otherArcs}", otherArcs)
+			.replace("{context}", qCtx));
 		if (qAbort.current) { setQRunning(false); return; }
 		let planParsed = null;
 		try { planParsed = JSON.parse(planRaw); } catch {}
@@ -527,17 +607,18 @@ export default function App() {
 
 		const theme = planParsed?.theme || "";
 		const reasoning = planParsed?.reasoning || "";
-		const genRaw = await qCall(
-			"generate",
-			qTpl.questGen.body
-				.replace("{theme}", theme)
-				.replace("{reasoning}", reasoning)
-				.replace("{context}", qCtx),
-		);
+		const genPrompt = qTpl.questGen.body
+			.replace("{theme}", theme)
+			.replace("{reasoning}", reasoning)
+			.replace("{context}", qCtx)
+			+ (qForceType ? `\n\n> OVERRIDE: You MUST use questType "${qForceType}" for every step. Do not use any other type.` : "");
+		const genRaw = await qCall("generate", genPrompt);
 		if (qAbort.current) { setQRunning(false); return; }
 		let genParsed = null;
 		try { genParsed = JSON.parse(genRaw); } catch {}
 		setQStages((s) => [...s, {key: "generate", text: genRaw, parsed: genParsed}]);
+
+		if (genParsed?.arcBeat && qArc) appendChronicle(qArc, genParsed.arcBeat);
 
 		setQDone(true);
 		setQActive(null);
@@ -584,6 +665,12 @@ export default function App() {
 							</span>
 						</div>
 					)}
+					{parsed.arcAspect && (
+						<div style={{marginBottom: 10}}>
+							<div style={lbl}>Arc Aspect</div>
+							<div style={{color: "#8a7a5a", fontSize: 12, fontStyle: "italic"}}>{parsed.arcAspect}</div>
+						</div>
+					)}
 					{parsed.reasoning && (
 						<div>
 							<div style={lbl}>Reasoning</div>
@@ -597,14 +684,24 @@ export default function App() {
 		}
 		if (key === "generate") {
 			if (parsed?.quests?.length)
-				return parsed.quests.map((q, i) => (
-					<div key={i}>
-						<div style={{color: "#6b5e4e", fontSize: 11, marginBottom: 2}}>Step {i + 1}</div>
-						<pre style={{color: "#d4c9b8", fontSize: 12, whiteSpace: "pre-wrap", margin: "0 0 12px"}}>
-							{JSON.stringify(q, null, 2)}
-						</pre>
+				return (
+					<div>
+						{parsed.arcBeat && (
+							<div style={{marginBottom: 12, padding: "8px 12px", background: "#0f1a10", border: "1px solid #2a4a2a", borderRadius: 4}}>
+								<div style={lbl}>Arc Beat — add to chronicle</div>
+								<div style={{color: "#6b9a6b", fontSize: 12, fontStyle: "italic"}}>{parsed.arcBeat}</div>
+							</div>
+						)}
+						{parsed.quests.map((q, i) => (
+							<div key={i}>
+								<div style={{color: "#6b5e4e", fontSize: 11, marginBottom: 2}}>Step {i + 1}</div>
+								<pre style={{color: "#d4c9b8", fontSize: 12, whiteSpace: "pre-wrap", margin: "0 0 12px"}}>
+									{JSON.stringify(q, null, 2)}
+								</pre>
+							</div>
+						))}
 					</div>
-				));
+				);
 			if (parsed?.quest)
 				return (
 					<pre style={{color: "#d4c9b8", fontSize: 12, whiteSpace: "pre-wrap", margin: 0}}>
@@ -942,7 +1039,7 @@ export default function App() {
 					padding: "0 20px",
 				}}
 			>
-				{["context", "templates", "pipeline", "debug", "quest"].map((t) => (
+				{["context", "templates", "pipeline", "debug", "quest", "arc"].map((t) => (
 					<button
 						key={t}
 						onClick={() => setTab(t)}
@@ -1374,6 +1471,92 @@ export default function App() {
 										}}
 										spellCheck={false}
 									/>
+									<div style={{display: "flex", alignItems: "center", gap: 8, marginTop: 10}}>
+										<span style={{color: "#6b5e4e", fontSize: 11, whiteSpace: "nowrap"}}>Force quest type</span>
+										<select
+											value={qForceType}
+											onChange={(e) => setQForceType(e.target.value)}
+											style={{
+												flex: 1,
+												background: "#0a0908",
+												border: "1px solid #2a2520",
+												borderRadius: 4,
+												color: qForceType ? "#a89878" : "#4a3e30",
+												fontFamily: "monospace",
+												fontSize: 12,
+												padding: "4px 8px",
+												outline: "none",
+											}}
+										>
+											<option value="">— agent decides —</option>
+											<option>gatherCommonResource</option>
+											<option>acquireSpecialMonsterLoot</option>
+											<option>GoToQuestGiver</option>
+											<option>goToLocation</option>
+											<option>reachTitle</option>
+											<option>reachSkillLevel</option>
+										</select>
+									</div>
+									<div style={{display: "flex", alignItems: "center", gap: 8, marginTop: 10}}>
+										<span style={{color: "#6b5e4e", fontSize: 11, whiteSpace: "nowrap"}}>Season day</span>
+										<input
+											type="number"
+											min={1}
+											max={7}
+											value={qSeasonDay}
+											onChange={(e) => setQSeasonDay(Math.min(7, Math.max(1, Number(e.target.value))))}
+											style={{
+												width: 48,
+												background: "#0a0908",
+												border: "1px solid #2a2520",
+												borderRadius: 4,
+												color: "#a89878",
+												fontFamily: "monospace",
+												fontSize: 12,
+												padding: "4px 8px",
+												outline: "none",
+												textAlign: "center",
+											}}
+										/>
+										<span style={{color: "#3a3228", fontSize: 11}}>/ 7</span>
+									</div>
+									<div style={{marginTop: 14}}>
+										<div style={{color: "#6b5e4e", fontSize: 11, marginBottom: 4}}>
+											Active arc
+											{arcRegistry.length === 0 && <span style={{color: "#3a3228"}}> — mint arcs in the arc tab first</span>}
+										</div>
+										<select
+											value={qArc}
+											onChange={(e) => setQArc(e.target.value)}
+											style={{
+												width: "100%",
+												background: "#0a0908",
+												border: "1px solid #2a2520",
+												borderRadius: 4,
+												color: qArc ? "#a89878" : "#4a3e30",
+												fontFamily: "monospace",
+												fontSize: 12,
+												padding: "4px 10px",
+												outline: "none",
+											}}
+										>
+											<option value="">— none (free theme) —</option>
+											{arcRegistry.filter((a) => a.status === "active").map((a) => (
+												<option key={a.id} value={a.id}>{a.arcTitle} [{a.owner}]</option>
+											))}
+										</select>
+										{qArc && (() => {
+											const arc = arcRegistry.find((a) => a.id === qArc);
+											return arc?.chronicle?.length > 0 ? (
+												<div style={{marginTop: 6, padding: "6px 10px", background: "#0d0c0b", border: "1px solid #1a2a1a", borderRadius: 3}}>
+													<div style={{color: "#5a4e3a", fontSize: 10, marginBottom: 4}}>Chronicle ({arc.chronicle.length})</div>
+													{arc.chronicle.map((c, i) => (
+														<div key={i} style={{color: "#6b8a6b", fontSize: 11, lineHeight: 1.7}}>• {c}</div>
+													))}
+												</div>
+											) : <div style={{color: "#3a3228", fontSize: 11, marginTop: 4}}>No chronicle entries yet.</div>;
+										})()}
+									</div>
 								</div>
 							)}
 
@@ -1563,6 +1746,133 @@ export default function App() {
 					</div>
 				)}
 			</div>
+			{tab === "arc" && (
+				<div style={{flex: 1, display: "flex", flexDirection: "column", overflow: "hidden"}}>
+					{/* Registry */}
+					<div style={{flex: arcRegistry.length ? "0 0 auto" : "0 0 0px", overflowY: "auto", maxHeight: "50%", padding: arcRegistry.length ? "16px 20px 0" : 0}}>
+						{arcRegistry.length > 0 && (
+							<div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10}}>
+								<div style={{fontSize: 11, color: "#5a4e3a", letterSpacing: 2, textTransform: "uppercase", fontFamily: "monospace"}}>
+									Season Arc Registry ({arcRegistry.length})
+								</div>
+								<button onClick={() => { saveRegistry([]); setArcResult(null); }} style={{background: "none", border: "1px solid #3a2820", borderRadius: 3, color: "#5a3a2a", fontSize: 10, padding: "2px 8px", cursor: "pointer", fontFamily: "monospace"}}>
+									Clear Season
+								</button>
+							</div>
+						)}
+						{arcRegistry.map((arc) => (
+							<div key={arc.id} style={{border: "1px solid #2a2520", borderRadius: 4, marginBottom: 8, background: "#0d0c0b"}}>
+								<div
+									onClick={() => setArcExpanded(arcExpanded === arc.id ? null : arc.id)}
+									style={{padding: "10px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10}}
+								>
+									<span style={{color: "#6b9a6b", fontSize: 10, fontFamily: "monospace"}}>{arcExpanded === arc.id ? "▼" : "▶"}</span>
+									<div style={{flex: 1}}>
+										<div style={{color: "#d4c9b8", fontSize: 12}}>{arc.arcTitle}</div>
+										<div style={{color: "#5a4e3a", fontSize: 11, marginTop: 2}}>
+											owner: {arc.owner} · day {arc.dayMinted} · {arc.chronicle?.length || 0} chronicle entries
+										</div>
+									</div>
+									<span style={{
+										fontSize: 10, fontFamily: "monospace", padding: "1px 7px", borderRadius: 3,
+										background: arc.status === "active" ? "#1a3a1a" : "#2a2520",
+										color: arc.status === "active" ? "#4a9a4a" : "#5a4e3a",
+									}}>{arc.status}</span>
+								</div>
+								{arcExpanded === arc.id && (
+									<div style={{padding: "0 14px 14px", borderTop: "1px solid #1a1814"}}>
+										<div style={{color: "#7a6e60", fontSize: 11, lineHeight: 1.7, marginTop: 10}}>{arc.tension}</div>
+										{arc.openMysteries?.length > 0 && (
+											<div style={{marginTop: 8}}>
+												<div style={lbl}>Open Mysteries</div>
+												{arc.openMysteries.map((m, i) => (
+													<div key={i} style={{color: "#6b5e4e", fontSize: 11, lineHeight: 1.8}}>? {m}</div>
+												))}
+											</div>
+										)}
+										{arc.chronicle?.length > 0 && (
+											<div style={{marginTop: 8}}>
+												<div style={lbl}>Chronicle</div>
+												{arc.chronicle.map((c, i) => (
+													<div key={i} style={{color: "#6b8a6b", fontSize: 11, lineHeight: 1.8}}>• {c}</div>
+												))}
+											</div>
+										)}
+										<div style={{display: "flex", gap: 8, marginTop: 10}}>
+											<button
+												onClick={() => { setQArc(arc.id); setTab("quest"); setQTab("context"); }}
+												style={{background: "none", border: "1px solid #2a4a2a", borderRadius: 3, color: "#4a7a4a", fontSize: 10, padding: "3px 10px", cursor: "pointer", fontFamily: "monospace"}}
+											>
+												Use in Quest Panel →
+											</button>
+											<button
+												onClick={() => saveRegistry(arcRegistry.map((a) => a.id === arc.id ? {...a, status: a.status === "active" ? "resolved" : "active"} : a))}
+												style={{background: "none", border: "1px solid #2a2520", borderRadius: 3, color: "#5a4e3a", fontSize: 10, padding: "3px 10px", cursor: "pointer", fontFamily: "monospace"}}
+											>
+												{arc.status === "active" ? "Mark resolved" : "Reactivate"}
+											</button>
+										</div>
+									</div>
+								)}
+							</div>
+						))}
+					</div>
+
+					{/* Mint form */}
+					<div style={{flex: 1, display: "flex", flexDirection: "column", padding: 20, gap: 10, overflowY: "auto"}}>
+						<div style={{fontSize: 11, color: "#5a4e3a", letterSpacing: 2, textTransform: "uppercase", fontFamily: "monospace"}}>
+							Mint New Arc
+						</div>
+						<div style={{display: "flex", gap: 8, alignItems: "center"}}>
+							<span style={{color: "#6b5e4e", fontSize: 11, whiteSpace: "nowrap"}}>Owned by</span>
+							<input
+								value={arcOwner}
+								onChange={(e) => setArcOwner(e.target.value)}
+								placeholder="player or party name"
+								style={{flex: 1, background: "#0a0908", border: "1px solid #2a2520", borderRadius: 4, color: "#a89878", fontFamily: "monospace", fontSize: 12, padding: "4px 10px", outline: "none"}}
+							/>
+						</div>
+						<textarea
+							value={arcInput}
+							onChange={(e) => setArcInput(e.target.value)}
+							placeholder="Describe the arc tension in plain language…&#10;e.g. A rogue faction within the Circle has a dark secret collaboration with the Orc Shamanic Dark Mother."
+							style={{
+								flex: 1,
+								minHeight: 80,
+								background: "#0a0908",
+								border: "1px solid #2a2520",
+								borderRadius: 4,
+								color: "#a89878",
+								fontFamily: "monospace",
+								fontSize: 12,
+								lineHeight: 1.6,
+								padding: 14,
+								resize: "none",
+								outline: "none",
+							}}
+							spellCheck={false}
+						/>
+						<button
+							onClick={arcRun}
+							disabled={arcRunning || !apiKey || !arcInput.trim()}
+							style={btnS(arcRunning || !apiKey || !arcInput.trim() ? "#1a1a1a" : "#1e3828", arcRunning || !apiKey || !arcInput.trim() ? "#333" : "#4a9a68")}
+						>
+							{arcRunning ? "Seeding arc…" : "▶ Mint Arc"}
+						</button>
+						{arcResult && (
+							<div style={{fontSize: 12, padding: "10px 14px", borderRadius: 4, border: "1px solid #2a2520", background: "#0d0c0b"}}>
+								{arcResult.minted ? (
+									<div style={{color: "#4a9a4a"}}>✓ Arc minted — "{arcResult.parsed?.arcTitle}" added to registry.</div>
+								) : arcResult.parsed?.mode === "arc_exists" ? (
+									<div style={{color: "#9a7a2a"}}>↩ Concept maps to existing arc [{arcResult.parsed.existingArcId}] — no new arc minted.</div>
+								) : (
+									<pre style={{color: "#a89878", whiteSpace: "pre-wrap", margin: 0}}>{arcResult.text}</pre>
+								)}
+							</div>
+						)}
+					</div>
+				</div>
+			)}
 			<style>{"@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}"}</style>
 		</div>
 	);

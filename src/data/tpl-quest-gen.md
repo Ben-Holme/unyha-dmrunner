@@ -12,6 +12,8 @@ You are generating quest data based on an approved theme. The npc (trader) is th
 
 ## Context
 
+The context below may include named locations with xyz coordinates. Use these coordinates for the `location` field on relevant quest steps.
+
 {context}
 
 ## Valid item IDs
@@ -71,13 +73,15 @@ Use ONLY the following quest types. Match the approved theme to the most appropr
 
 ($
   "mode": "generate",
+  "arcBeat": "", // string — one sentence describing what this quest chain reveals or advances in the arc; add this to the chronicle after the session. Omit if no active arc.
   "quests": [
     ($ // Step 1
+"questType": "", // string — the quest type used (from Quest types section above)
 "title": "", // string — short quest title
-"description": "", // string — flavour text shown to player; use [n] as paragraph separator; this is spoken by the npc quest giver (or internal thoughts of the player character if #notrader)
+"description": "", // string — ALWAYS written as the NPC's spoken words (first person, in-character). Exception: if #nonpc is in specialBlob, write as the player character's internal thoughts instead. Use [n] as paragraph separator.
 "directTrade": false, // bool — true if simple trade quest (give items, get reward), no NPC dialogue needed
-"location": "", // string — where this quest is available
-"npcTitle": "", // string — title of the NPC giving the quest, will be appended to name so must begin with "the "
+"location": "", // string — optional waypoint for the player; use xyz coords from context (e.g. "100,200,300") or a named location if no coords are available
+"npcTitle": "", // string — title ONLY, NEVER a name. Must start with "the ". e.g. "the Keeper", "the Iron Smith". The system assigns a random name separately.
 "objective": ($ // item the player must collect / deliver
 "itemid": "", // string — real itemid from Valid item IDs list (or blank)
 "amount": 1, // int — quantity required
