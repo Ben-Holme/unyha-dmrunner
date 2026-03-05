@@ -292,8 +292,6 @@ export default function App() {
 	const [arcRegistry, setArcRegistry] = useState(() => {
 		try { return JSON.parse(localStorage.getItem("arcRegistry") || "[]"); } catch { return []; }
 	});
-	const [arcInput, setArcInput] = useState("");
-	const [arcOwner, setArcOwner] = useState("");
 	const [arcRunning, setArcRunning] = useState(false);
 	const [arcResult, setArcResult] = useState(null);
 	const [arcExpanded, setArcExpanded] = useState(null);
@@ -493,14 +491,15 @@ export default function App() {
 	// ─── Arc seeder ──────────────────────────────────────────────────────────────
 
 	const arcRun = async () => {
-		if (!arcInput.trim()) return;
+		if (!ctx.trim()) return;
 		setArcRunning(true);
 		setArcResult(null);
 		const existingSummary = arcRegistry.length
 			? arcRegistry.map((a) => `- [${a.id}] "${a.arcTitle}": ${a.tension}`).join("\n")
 			: "none";
+		const owner = (ctx.match(/^name:\s*(.+)$/m)?.[1] ?? "unknown").trim();
 		const msg = TPL_ARC_SEED
-			.replace("{concept}", arcInput)
+			.replace("{context}", ctx)
 			.replace("{existingArcs}", existingSummary)
 			.replace(/\(\$/g, "{").replace(/\$\)/g, "}");
 		try {
@@ -518,7 +517,7 @@ export default function App() {
 				const newArc = {
 					...parsed,
 					id: `arc_${Date.now()}`,
-					owner: arcOwner.trim() || "unknown",
+					owner,
 					dayMinted: qSeasonDay,
 					status: "active",
 					chronicle: [],
@@ -1823,41 +1822,19 @@ export default function App() {
 						<div style={{fontSize: 11, color: "#5a4e3a", letterSpacing: 2, textTransform: "uppercase", fontFamily: "monospace"}}>
 							Mint New Arc
 						</div>
-						<div style={{display: "flex", gap: 8, alignItems: "center"}}>
-							<span style={{color: "#6b5e4e", fontSize: 11, whiteSpace: "nowrap"}}>Owned by</span>
-							<input
-								value={arcOwner}
-								onChange={(e) => setArcOwner(e.target.value)}
-								placeholder="player or party name"
-								style={{flex: 1, background: "#0a0908", border: "1px solid #2a2520", borderRadius: 4, color: "#a89878", fontFamily: "monospace", fontSize: 12, padding: "4px 10px", outline: "none"}}
-							/>
+						<div style={{fontSize: 11, color: "#4a3e2e", fontFamily: "monospace", lineHeight: 1.5}}>
+							Arc will be seeded from the character context loaded in the DM Runner tab.
+							{ctx.trim()
+								? <span style={{color: "#6b5e3e"}}> Context active: <em>{PRESETS.find((p) => p.context === ctx)?.label ?? "custom"}</em></span>
+								: <span style={{color: "#7a3030"}}> No context loaded — set one in the DM Runner tab first.</span>
+							}
 						</div>
-						<textarea
-							value={arcInput}
-							onChange={(e) => setArcInput(e.target.value)}
-							placeholder="Describe the arc tension in plain language…&#10;e.g. A rogue faction within the Circle has a dark secret collaboration with the Orc Shamanic Dark Mother."
-							style={{
-								flex: 1,
-								minHeight: 80,
-								background: "#0a0908",
-								border: "1px solid #2a2520",
-								borderRadius: 4,
-								color: "#a89878",
-								fontFamily: "monospace",
-								fontSize: 12,
-								lineHeight: 1.6,
-								padding: 14,
-								resize: "none",
-								outline: "none",
-							}}
-							spellCheck={false}
-						/>
 						<button
 							onClick={arcRun}
-							disabled={arcRunning || !apiKey || !arcInput.trim()}
-							style={btnS(arcRunning || !apiKey || !arcInput.trim() ? "#1a1a1a" : "#1e3828", arcRunning || !apiKey || !arcInput.trim() ? "#333" : "#4a9a68")}
+							disabled={arcRunning || !apiKey || !ctx.trim()}
+							style={btnS(arcRunning || !apiKey || !ctx.trim() ? "#1a1a1a" : "#1e3828", arcRunning || !apiKey || !ctx.trim() ? "#333" : "#4a9a68")}
 						>
-							{arcRunning ? "Seeding arc…" : "▶ Mint Arc"}
+							{arcRunning ? "Seeding arc…" : "▶ Mint Arc from Context"}
 						</button>
 						{arcResult && (
 							<div style={{fontSize: 12, padding: "10px 14px", borderRadius: 4, border: "1px solid #2a2520", background: "#0d0c0b"}}>

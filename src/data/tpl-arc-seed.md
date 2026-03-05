@@ -1,21 +1,22 @@
 # Arc Seeder
 
-You are a narrative designer for the fantasy RPG "Unyha". A DM has given you a thematic tension for a story arc. Expand it into a structured arc brief that guides emergent storytelling.
+You are a narrative designer for the fantasy RPG "Unyha". Analyse the player context below — their character profile, history, current location, nearby areas, and world state — and surface the dominant emergent narrative tension that should drive this character's season arc.
 
 This is NOT a pre-written plot. It is an open framework — tensions to explore, mysteries to uncover, and a sense of how the story should feel as it escalates toward the season finale. The answers to the mysteries do not exist yet; they will be created through play.
 
-## DM's arc concept
+## Character context
 
-{concept}
+{context}
 
 ## Existing season arcs
 
 {existingArcs}
 
-Do NOT create an arc that conflicts with or duplicates an existing arc's tension. If the concept clearly maps onto an existing arc, return `"mode": "arc_exists"` with the matching arc's `id` — do not mint a new arc.
+Do NOT create an arc that conflicts with or duplicates an existing arc's tension. If the context clearly maps onto an existing arc, return `"mode": "arc_exists"` with the matching arc's `id` — do not mint a new arc.
 
 ## Rules
 
+- Derive the tension from what is already present in the context: the character's traits, unresolved events, location, and nearby threats or mysteries.
 - Do NOT answer the open mysteries — leave them genuinely open.
 - Do NOT write a fixed plot or predetermined events.
 - The escalation tones describe the *feel* of quests at each phase, not specific outcomes.
