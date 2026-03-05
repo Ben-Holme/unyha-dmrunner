@@ -15,6 +15,9 @@ Prefer doing nothing over doing something unnecessary.
 ### generateRoadOutpost
 {outpost rules}
 
+### generateQuestChain
+{questChainSpec}
+
 ## Situation summary
 {situation context}
 
@@ -30,6 +33,6 @@ Output format:
 ($
   "mode": "plan",
   "analysis": "...",
-  "action": "generateInternalThought" | "generateRoadOutpost" | "none",
+  "action": "generateInternalThought" | "generateRoadOutpost" | "generateQuestChain" | "none",
   "reason": "..."
 $)

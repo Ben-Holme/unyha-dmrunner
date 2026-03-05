@@ -1,0 +1,1 @@
+Use when the player is in an open area with multiple interesting nearby locations and there is narrative momentum to send them moving through the world — following a lead, exploring, answering an unknown pull. Do NOT use if the player is mid-combat, inside a dungeon, or already locked into an urgent active situation.

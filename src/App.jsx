@@ -4,8 +4,10 @@ import _SYS_WORLD     from "./data/sys-world.md?raw";
 import _SYS_AGENT     from "./data/sys-agent.md?raw";
 import _TPL_DISTILL   from "./data/tpl-distill.md?raw";
 import _TPL_PLAN      from "./data/tpl-plan.md?raw";
-import _TPL_ACT_THOUGHT  from "./data/tpl-act-thought.md?raw";
-import _TPL_ACT_OUTPOST  from "./data/tpl-act-outpost.md?raw";
+import _TPL_ACT_THOUGHT     from "./data/tpl-act-thought.md?raw";
+import _TPL_ACT_OUTPOST     from "./data/tpl-act-outpost.md?raw";
+import _TPL_ACT_QUEST_CHAIN from "./data/tpl-act-quest-chain.md?raw";
+import _SPEC_QUEST_CHAIN    from "./data/spec-quest-chain.md?raw";
 import _SPEC_THOUGHT  from "./data/spec-thought.md?raw";
 import _SPEC_OUTPOST  from "./data/spec-outpost.md?raw";
 import _TPL_QUEST_PLAN from "./data/tpl-quest-plan.md?raw";
@@ -162,8 +164,10 @@ const TPL_DISTILL      = _TPL_DISTILL.trim();
 const TPL_PLAN         = _TPL_PLAN.trim();
 const TPL_ACT_THOUGHT  = _TPL_ACT_THOUGHT.trim();
 const TPL_ACT_OUTPOST  = _TPL_ACT_OUTPOST.trim();
-const SPEC_THOUGHT     = _SPEC_THOUGHT.trim();
-const SPEC_OUTPOST     = _SPEC_OUTPOST.trim();
+const SPEC_THOUGHT      = _SPEC_THOUGHT.trim();
+const SPEC_OUTPOST      = _SPEC_OUTPOST.trim();
+const TPL_ACT_QUEST_CHAIN = _TPL_ACT_QUEST_CHAIN.trim();
+const SPEC_QUEST_CHAIN  = _SPEC_QUEST_CHAIN.trim();
 const TPL_QUEST_PLAN   = _TPL_QUEST_PLAN.trim();
 const TPL_QUEST_GEN    = _TPL_QUEST_GEN.trim().replace('{itemIds}', _ITEMS.trim()).replace('{itemNotes}', _ITEM_NOTES.trim()).replace('{questTypes}', _QUEST_TYPES.trim());
 const TPL_ARC_SEED     = _TPL_ARC_SEED.trim();
@@ -186,15 +190,18 @@ const DEFAULT_TPL = {
 		body: TPL_ACT_THOUGHT,
 	},
 	act_outpost: {label: "03b — Act: Outpost", desc: "Road encounter seed", body: TPL_ACT_OUTPOST},
+	act_questChain: {label: "03c — Act: Quest Chain", desc: "3-step goToLocation chain", body: TPL_ACT_QUEST_CHAIN},
 };
 const DEFAULT_SPECS = {
 	internalThoughtReqs: {label: "generateInternalThought spec", body: SPEC_THOUGHT},
 	outpostRules: {label: "generateRoadOutpost spec", body: SPEC_OUTPOST},
+	questChainSpec: {label: "generateQuestChain spec", body: SPEC_QUEST_CHAIN},
 };
 
 const ACTION_COLORS = {
 	generateInternalThought: "#7a9abf",
 	generateRoadOutpost: "#c4883a",
+	generateQuestChain: "#6a9a5a",
 	outpost: "#c4883a",
 	none: "#555",
 };
@@ -424,6 +431,7 @@ export default function App() {
 			tpl.plan.body
 				.replace("{internalThoughtReqs}", specs.internalThoughtReqs.body)
 				.replace("{outpostRules}", specs.outpostRules.body)
+				.replace("{questChainSpec}", specs.questChainSpec.body)
 				.replace("{situation_context}", dContent),
 		);
 		if (abort.current) {
@@ -451,6 +459,11 @@ export default function App() {
 					.replace("{ana}", ana)
 					.replace("{reas}", reas)
 					.replace("{situation_context_json}", dContent);
+			if (action === "generateQuestChain")
+				actMsg = tpl.act_questChain.body
+					.replace("{prior_analysis}", ana)
+					.replace("{prior_reason}", reas)
+					.replace("{situation_context}", dContent);
 			if (actMsg) {
 				const aRaw = await call("act", actMsg);
 				if (abort.current) {
